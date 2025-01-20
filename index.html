@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lucky Jet - Cotes et Bot Telegram</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #00ff99;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        h1 {
+            margin-top: 20px;
+        }
+        .intro-text {
+            font-size: 2rem;
+            margin-top: 50px;
+            color: #ffffff;
+            text-shadow: 0 0 10px #00ff99;
+        }
+        .cotes-container {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 10px;
+            background: #1e1e1e;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        .cote-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-bottom: 1px solid #00ff99;
+        }
+        .cote-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="intro-text">💀💀🅢𝗽𝗶𝗿𝗶𝘁𝘆🅓𝗮𝘁𝗮🅑𝗮𝘀𝗲📉</div>
+    <h1>Lucky Jet - Historique des Cotes</h1>
+    <div class="cotes-container" id="cotesContainer">
+        <p id="loading">Chargement des cotes...</p>
+    </div>
+
+    <script>
+        const API_URL = "https://crash-gateway-cr.100hp.app/history?id_n=1play_luckyjet";
+        const TELEGRAM_API = "https://api.telegram.org/bot7811399786:AAEG4sXnrKlAqJDl08TwGkx9uDDosB5lMj0";
+        const CHAT_ID = "7104713412";
+
+        let storedCotes = JSON.parse(localStorage.getItem('cotes')) || [];
+        let telegramMessageId = localStorage.getItem('telegramMessageId'); // Stocker le message ID
+
+        // Récupérer les cotes depuis l'API
+        async function fetchCotes() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error("Échec de l'appel à l'API");
+                const data = await response.json();
+
+                const lastCoefficient = data[0].top_coefficient;
+
+                // Vérifie si la cote est déjà enregistrée
+                if (!storedCotes.find(cote => cote.value === lastCoefficient)) {
+                    const date = new Date();
+                    const formattedTime = date.toLocaleTimeString(); // Heure locale
+
+                    // Ajouter la nouvelle cote
+                    storedCotes.push({
+                        value: lastCoefficient,
+                        time: formattedTime,
+                    });
+
+                    // Sauvegarder dans localStorage
+                    localStorage.setItem('cotes', JSON.stringify(storedCotes));
+
+                    // Mettre à jour l'affichage
+                    renderCotes();
+
+                    // Envoyer ou mettre à jour la cote sur Telegram
+                    await updateTelegramMessage();
+                }
+            } catch (error) {
+                console.error("Erreur lors de la récupération des cotes :", error);
+            }
+        }
+
+        // Afficher les cotes
+        function renderCotes() {
+            const container = document.getElementById("cotesContainer");
+            container.innerHTML = ""; // Réinitialiser le contenu
+            storedCotes.forEach((cote, index) => {
+                const item = document.createElement("div");
+                item.className = "cote-item";
+                item.textContent = `${index + 1}- ${cote.value} (${cote.time})`;
+                container.appendChild(item);
+            });
+        }
+
+        // Fonction pour envoyer ou mettre à jour le message Telegram
+        async function updateTelegramMessage() {
+            try {
+                const message = `💀💀🅢𝗽𝗶𝗿𝗶𝘁𝘆🅓𝗮𝘁𝗮🅑𝗮𝘀𝗲📉\n` +
+                    storedCotes
+                    .map((cote, index) => `${index + 1}- ${cote.value} (${cote.time})`)
+                    .join("\n");
+
+                if (telegramMessageId) {
+                    // Si un message existe, on le met à jour
+                    await fetch(`${TELEGRAM_API}/editMessageText`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            chat_id: CHAT_ID,
+                            message_id: telegramMessageId,
+                            text: message,
+                            parse_mode: "Markdown",
+                        }),
+                    });
+                } else {
+                    // Sinon, on envoie un nouveau message et on sauvegarde son ID
+                    const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            chat_id: CHAT_ID,
+                            text: message,
+                            parse_mode: "Markdown",
+                        }),
+                    });
+                    const result = await response.json();
+                    if (result.ok) {
+                        telegramMessageId = result.result.message_id;
+                        localStorage.setItem('telegramMessageId', telegramMessageId); // Sauvegarder l'ID
+                    }
+                }
+            } catch (error) {
+                console.error("Erreur lors de l'envoi/mise à jour sur Telegram :", error);
+            }
+        }
+
+        // Initialisation
+        renderCotes(); // Afficher les cotes sauvegardées
+        setInterval(fetchCotes, 3000); // Mettre à jour toutes les 3 secondes
+    </script>
+</body>
+</html>
